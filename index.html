@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A silly 90-second barista game. Picky cats order ridiculous drinks and swat the cup off the counter if you get it wrong.">
+<meta name="theme-color" content="#f4a3b6">
+<title>Grumpy Cat Café</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: phone-first column; café scene on top, ingredient "register" below. Single mint-and-pink diner look by choice. */
+:root{
+  --mint:#cdeee0; --mint-2:#a9dcc6; --pink:#f4a3b6; --pink-2:#e7869d; --plum:#3a2440; --muted:#6d5a72;
+  --butter:#ffe08a; --paper:#fffdf8; --line:rgba(58,36,64,.15); --good:#2f8a5e; --bad:#d4483b;
+  --display:"Chewy", "Comic Sans MS", "Trebuchet MS", sans-serif;
+  --body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{background:var(--mint); color:var(--plum); font-family:var(--body); font-size:16px; line-height:1.45;
+  padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px));
+  -webkit-tap-highlight-color:transparent}
+.app{max-width:540px; margin:0 auto; padding-block:16px 32px; display:flex; flex-direction:column; gap:14px; box-sizing:border-box}
+h1,h2,h3{font-family:var(--display); font-weight:400; margin:0; letter-spacing:.01em; text-wrap:balance}
+h1{font-size:2.7rem; line-height:1}
+h2{font-size:1.8rem; line-height:1.1}
+p{margin:0}
+.muted{color:var(--muted)}
+.label{font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700}
+.screen{display:flex; flex-direction:column; gap:14px}
+.stack{display:flex; flex-direction:column; gap:10px}
+.card{background:var(--paper); border:3px solid var(--plum); border-radius:20px; padding:14px 16px}
+.hero{display:flex; align-items:center; gap:12px}
+.hero svg{flex:none}
+.rules{display:flex; flex-direction:column; gap:8px; padding-left:0; margin:0; list-style:none}
+.rules li{display:flex; gap:10px; align-items:baseline}
+.rules b{font-family:var(--display); font-weight:400; font-size:1.15rem; color:var(--pink-2); min-width:1.2em}
+.feel{display:grid; grid-template-columns:repeat(5,1fr); gap:6px}
+.feel button{appearance:none; border:2px solid var(--line); background:var(--paper); color:var(--plum); border-radius:14px; font:inherit;
+  padding:10px 4px; font-size:.8rem; line-height:1.2; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer}
+.feel button .n{font-family:var(--display); font-size:1.4rem}
+.feel button[aria-pressed="true"]{border-color:var(--pink-2); background:#fde3ea}
+.btn{appearance:none; border:3px solid var(--plum); border-radius:999px; padding:12px 22px; font-family:var(--display); font-size:1.25rem; cursor:pointer;
+  background:var(--pink); color:var(--plum); box-shadow:0 4px 0 var(--plum)}
+.btn:active{transform:translateY(3px); box-shadow:0 1px 0 var(--plum)}
+.btn.ghost{background:transparent; box-shadow:none; border-width:2px; font-family:var(--body); font-size:.95rem; font-weight:700}
+.btn.serve{background:var(--butter)}
+.btn:disabled{opacity:.4; cursor:default}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+:focus-visible{outline:3px solid var(--plum); outline-offset:3px}
+
+/* HUD */
+.hud{display:flex; justify-content:space-between; align-items:flex-end; gap:10px; font-variant-numeric:tabular-nums}
+.hud > div{display:flex; flex-direction:column; gap:0}
+.hud .v{font-family:var(--display); font-size:1.7rem; line-height:1}
+.hud .mid{align-items:center}
+.hud .r{align-items:flex-end}
+
+/* Scene */
+.scene{position:relative; height:300px; border-radius:22px; overflow:hidden; border:3px solid var(--plum);
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.35) 0 22px, transparent 22px 44px),
+    var(--mint-2)}
+.sign{position:absolute; left:14px; top:12px; font-family:var(--display); font-size:1.05rem; background:var(--paper); border:2px solid var(--plum);
+  border-radius:10px; padding:2px 10px; transform:rotate(-3deg)}
+.cat{position:absolute; right:6%; bottom:58px; width:170px; height:160px; transition:transform .6s cubic-bezier(.3,.8,.3,1); transform:translateX(160%)}
+.cat.in{transform:translateX(0)}
+.cat.out{transform:translateX(-260%); transition-duration:.9s}
+.cat svg{width:100%; height:100%; display:block; overflow:visible}
+.cat .name{position:absolute; left:50%; bottom:-6px; transform:translateX(-50%); background:var(--paper); border:2px solid var(--plum); border-radius:8px;
+  padding:0 8px; font-size:.75rem; font-weight:700; white-space:nowrap; z-index:2}
+.bubble{position:absolute; left:12px; top:44px; width:47%; background:var(--paper); border:3px solid var(--plum); border-radius:16px; padding:8px 10px;
+  font-size:.92rem; line-height:1.3; min-height:62px; z-index:3}
+.bubble::after{content:""; position:absolute; right:-14px; top:22px; border:8px solid transparent; border-left:12px solid var(--plum)}
+.bubble.say{font-family:var(--display); font-size:1.15rem}
+.patience{position:absolute; left:12px; top:16px; right:auto; width:47%; height:10px; margin-top:-2px; border-radius:6px; background:rgba(58,36,64,.18); overflow:hidden; display:none}
+.patience i{display:block; height:100%; width:100%; background:var(--good); transition:background .3s}
+.patience.on{display:block; top:28px}
+.counter{position:absolute; left:0; right:0; bottom:0; height:64px; background:var(--pink); border-top:3px solid var(--plum)}
+.counter::before{content:""; position:absolute; left:0; right:0; top:0; height:10px; background:var(--pink-2)}
+.cup{position:absolute; left:22%; bottom:44px; width:92px; height:92px; z-index:4}
+.cup svg{width:100%; height:100%; display:block; overflow:visible}
+.cup{transform-origin:50% 85%}
+.cup.knock{animation:knock .9s cubic-bezier(.3,.1,.6,1) forwards}
+@keyframes knock{0%{transform:translate(0,0) rotate(0)}12%{transform:translate(-16px,-8px) rotate(-30deg)}30%{transform:translate(-42px,-16px) rotate(-85deg)}100%{transform:translate(-160px,220px) rotate(-280deg); opacity:.3}}
+.cup.sent{animation:sent .6s ease-in forwards}
+@keyframes sent{to{transform:translateX(160px) scale(.6); opacity:0}}
+/* The swatting arm: pivots at the cat's shoulder, aimed at the cup by script */
+.paw{position:absolute; height:22px; border-radius:12px; background:var(--pawc, #e8964a); border:3px solid var(--plum); transform-origin:100% 50%;
+  opacity:0; z-index:5; pointer-events:none; --aim:0deg}
+.paw::before{content:""; position:absolute; left:-16px; top:50%; width:36px; height:32px; transform:translateY(-50%); border-radius:50%;
+  background:var(--pawc, #e8964a); border:3px solid var(--plum)}
+.paw::after{content:""; position:absolute; left:-9px; top:50%; width:22px; height:20px; transform:translateY(-50%);
+  background:radial-gradient(circle at 50% 72%, #f4a3b6 0 4.5px, transparent 5px), radial-gradient(circle at 14% 30%, #f4a3b6 0 2.6px, transparent 3px),
+    radial-gradient(circle at 50% 8%, #f4a3b6 0 2.6px, transparent 3px), radial-gradient(circle at 86% 30%, #f4a3b6 0 2.6px, transparent 3px)}
+.paw.go{animation:swat .95s cubic-bezier(.45,0,.2,1) forwards}
+@keyframes swat{
+  0%{opacity:0; transform:rotate(calc(var(--aim) + 55deg)) scaleX(.55)}
+  12%{opacity:1; transform:rotate(calc(var(--aim) + 55deg)) scaleX(.8)}
+  38%{opacity:1; transform:rotate(calc(var(--aim) + 65deg)) scaleX(.8)}
+  50%{opacity:1; transform:rotate(calc(var(--aim) - 6deg)) scaleX(1)}
+  62%{opacity:1; transform:rotate(calc(var(--aim) - 2deg)) scaleX(1)}
+  88%{opacity:1; transform:rotate(calc(var(--aim) + 45deg)) scaleX(.65)}
+  100%{opacity:0; transform:rotate(calc(var(--aim) + 50deg)) scaleX(.55)}}
+.cat.swat svg{animation:lean .95s ease-in-out}
+@keyframes lean{0%,100%{transform:none}38%{transform:rotate(4deg)}50%{transform:translateX(-10px) rotate(-6deg)}62%{transform:translateX(-8px) rotate(-5deg)}}
+.drop{position:absolute; width:9px; height:9px; border-radius:50%; background:var(--c); border:1.5px solid var(--plum); z-index:6; pointer-events:none;
+  animation:drop .85s cubic-bezier(.2,.6,.6,1) forwards}
+@keyframes drop{50%{transform:translate(var(--mx), var(--my))}100%{transform:translate(var(--dx), var(--dy)); opacity:0}}
+.heart{position:absolute; font-size:1.4rem; color:var(--pink-2); pointer-events:none; animation:float 1.3s ease-out forwards; z-index:6}
+@keyframes float{to{transform:translateY(-80px) scale(1.4); opacity:0}}
+.coinpop{position:absolute; right:16px; top:12px; font-family:var(--display); font-size:1.3rem; color:var(--good); opacity:0; z-index:6}
+.coinpop.show{animation:coin 1s ease-out}
+@keyframes coin{0%{opacity:0; transform:translateY(8px)}20%{opacity:1; transform:translateY(0)}100%{opacity:0; transform:translateY(-16px)}}
+.overlay{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center;
+  padding:20px; background:rgba(255,253,248,.92); z-index:10}
+
+/* Register */
+.reg{display:flex; flex-direction:column; gap:8px}
+.reg .grp{display:grid; grid-template-columns:4.2em repeat(4, minmax(0,1fr)); gap:5px; align-items:stretch}
+.reg .gl{font-size:.7rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); align-self:center}
+.chip{appearance:none; border:2px solid var(--plum); background:var(--paper); color:var(--plum); border-radius:12px; font:inherit; font-size:.78rem; font-weight:700;
+  line-height:1.15; padding:7px 3px; cursor:pointer; display:flex; align-items:center; justify-content:center; text-align:center; min-height:44px; gap:4px}
+.chip .dot{width:10px; height:10px; border-radius:50%; flex:none; border:1px solid rgba(58,36,64,.35)}
+.chip[aria-pressed="true"]{background:var(--butter); box-shadow:inset 0 0 0 2px var(--plum)}
+.actions{display:flex; gap:10px}
+.actions .btn{flex:1}
+
+/* Results */
+.rank{background:var(--butter); border:3px solid var(--plum); border-radius:20px; padding:14px 16px; display:flex; flex-direction:column; gap:4px}
+.stats{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+.stats > div{background:var(--paper); border:2px solid var(--line); border-radius:16px; padding:12px 14px; display:flex; flex-direction:column; gap:2px}
+.stats .v{font-family:var(--display); font-size:1.8rem; line-height:1.05; font-variant-numeric:tabular-nums}
+.hist{display:flex; flex-direction:column; gap:6px; font-size:.9rem; font-variant-numeric:tabular-nums}
+.hist div{display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid var(--line); padding-bottom:6px}
+details.sci{border:2px solid var(--line); border-radius:16px; padding:14px 16px; background:var(--paper)}
+details.sci summary{cursor:pointer; font-family:var(--display); font-size:1.25rem; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:10px}
+details.sci summary::-webkit-details-marker{display:none}
+details.sci summary::after{content:"+"; color:var(--muted); font-family:var(--body); font-size:1.3rem}
+details.sci[open] summary::after{content:"–"}
+.sci-list{display:flex; flex-direction:column; gap:14px; margin-top:12px}
+.sci-item{display:flex; flex-direction:column; gap:6px; padding-top:12px; border-top:1px solid var(--line)}
+.sci-item .game{color:var(--pink-2); font-size:.78rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase}
+.sci-item .lim{color:var(--muted); font-size:.9rem}
+.sci-item .cite{font-size:.8rem; color:var(--muted)}
+.sci-item a{color:var(--plum)}
+@media (prefers-reduced-motion: reduce){ .cat{transition-duration:.01s} .cup.knock,.cup.sent,.paw.go,.heart{animation-duration:.3s} }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Intro -->
+  <section class="screen" id="intro">
+    <div class="hero">
+      <svg width="110" height="104" viewBox="0 0 160 150" aria-hidden="true" id="heroCat"></svg>
+      <div class="stack" style="gap:2px">
+        <div class="label">Stress Balls · Game 4</div>
+        <h1>Grumpy Cat Café</h1>
+      </div>
+    </div>
+    <p>You're the barista. The customers are cats. They are very particular, and they do not tip well.</p>
+    <div class="card">
+      <ul class="rules">
+        <li><b>1</b><span>Read the cat's order in the speech bubble.</span></li>
+        <li><b>2</b><span>Tap the cup, the drink, and any extras they asked for. Nothing more.</span></li>
+        <li><b>3</b><span>Tap Serve before their patience runs out.</span></li>
+        <li><b>4</b><span>Get it right and they purr. Get it wrong and they push the cup off the counter while staring at you.</span></li>
+      </ul>
+    </div>
+    <p class="muted">The café is open for 90 seconds. Orders get fancier as you go.</p>
+    <div class="stack">
+      <div class="label">Before you start, how do you feel?</div>
+      <div class="feel" id="feelPre"></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="startBtn">Open the café</button>
+      <button class="btn ghost" id="skipBtn">Skip the question</button>
+    </div>
+    <details class="sci"><summary>The science behind it</summary><div class="sci-list"></div></details>
+  </section>
+
+  <!-- Play -->
+  <section class="screen" id="play" hidden>
+    <div class="hud">
+      <div><span class="label">Tips</span><span class="v" id="hCoins">0</span></div>
+      <div class="mid"><span class="label">Purrs</span><span class="v" id="hPurrs">0</span></div>
+      <div class="r"><span class="label">Closing in</span><span class="v" id="hTime">90</span></div>
+    </div>
+    <div class="scene" id="scene">
+      <div class="sign">Open · No dogs</div>
+      <div class="patience" id="patience"><i id="patBar"></i></div>
+      <div class="bubble" id="bubble">…</div>
+      <div class="cat" id="cat"><svg viewBox="0 0 160 150" aria-hidden="true" id="catSvg"></svg><span class="name" id="catName"></span></div>
+      <div class="counter"></div>
+      <div class="paw" id="paw"></div>
+      <div class="cup" id="cup"></div>
+      <div class="coinpop" id="coinpop"></div>
+      <div class="overlay" id="overlay" hidden></div>
+    </div>
+    <div class="reg" id="reg"></div>
+    <div class="actions">
+      <button class="btn ghost" id="trashBtn">Start over</button>
+      <button class="btn serve" id="serveBtn">Serve</button>
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn ghost" id="muteBtn" style="padding:6px 14px; font-size:.85rem" aria-pressed="false">Sound on</button>
+    </div>
+  </section>
+
+  <!-- Feel after -->
+  <section class="screen" id="after" hidden>
+    <div class="label">The café is closed</div>
+    <h2>How do you feel now?</h2>
+    <div class="feel" id="feelPost"></div>
+    <div class="row"><button class="btn" id="seeBtn" disabled>See my shift</button></div>
+  </section>
+
+  <!-- Results -->
+  <section class="screen" id="results" hidden>
+    <div class="rank">
+      <span class="label" style="color:var(--plum)">Your title</span>
+      <h2 id="rRank">Purr Technician</h2>
+      <p id="rRankLine"></p>
+    </div>
+    <p id="rFeel"></p>
+    <div class="stats">
+      <div><span class="label">Tips earned</span><span class="v" id="rCoins">0</span></div>
+      <div><span class="label">Cats served</span><span class="v" id="rServed">0</span></div>
+      <div><span class="label">Purrs</span><span class="v" id="rPurrs">0</span></div>
+      <div><span class="label">Cups knocked off</span><span class="v" id="rKnocked">0</span></div>
+      <div><span class="label">Cats who left</span><span class="v" id="rLeft">0</span></div>
+      <div><span class="label">Best purr streak</span><span class="v" id="rStreak">0</span></div>
+    </div>
+    <div class="row"><button class="btn" id="againBtn">Work another shift</button></div>
+    <details class="sci"><summary>The science behind it</summary><div class="sci-list"></div></details>
+    <div class="stack" id="histWrap" hidden>
+      <div class="label">Recent shifts on this phone</div>
+      <div class="hist" id="hist"></div>
+      <p class="muted" style="font-size:.8rem">Saved in this browser only. Clearing browsing data erases it.</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+const GAME_SECONDS = 90;
+const FEELS = ["Very tense","Tense","Okay","Calm","Very calm"];
+const MENU = {
+  cup:   [{id:"mug", name:"Mug"},{id:"bowl", name:"Tiny bowl"},{id:"box", name:"Cardboard box"},{id:"glass", name:"Fancy glass"}],
+  base:  [{id:"warm", name:"Warm milk", c:"#fff3dc"},{id:"oat", name:"Oat milk", c:"#e6cf9f"},{id:"tea", name:"Catnip tea", c:"#9cc77a"},{id:"tuna", name:"Tuna water", c:"#c3d3d8"}],
+  addin: [{id:"salmon", name:"Salmon syrup", c:"#f39a8a"},{id:"nip", name:"Catnip", c:"#5e9e46"},{id:"cream", name:"Cream", c:"#fffaf0"},{id:"sardine", name:"Sardine", c:"#8fa3b0"}],
+  top:   [{id:"foam", name:"Extra foam", c:"#ffffff"},{id:"flakes", name:"Fish flakes", c:"#f08a3c"},{id:"sprinkles", name:"Sprinkles", c:"#e94f8a"},{id:"whip", name:"Whipped cream", c:"#fff6ea"}]
+};
+const GROUPS = [["cup","Cup"],["base","Drink"],["addin","Add"],["top","Top"]];
+const CATS = [
+  {name:"Sir Fluffington", fur:"#e8964a", line:"#3a2440"},
+  {name:"Mittens the Unimpressed", fur:"#8f95a1", line:"#3a2440"},
+  {name:"Gerald", fur:"#2f2b33", line:"#e9e2ea"},
+  {name:"Duchess Biscuit", fur:"#f4f1ef", line:"#3a2440"},
+  {name:"Kevin", fur:"#e9c99a", line:"#3a2440"},
+  {name:"Lady Whiskerton", fur:"#f4f1ef", line:"#3a2440", patch:true},
+  {name:"Meatball", fur:"#e8964a", line:"#3a2440", patch:true},
+  {name:"Professor Paws", fur:"#8f95a1", line:"#3a2440", stripes:true},
+  {name:"Chairman Meow", fur:"#2f2b33", line:"#e9e2ea"},
+  {name:"Nugget", fur:"#e9c99a", line:"#3a2440", stripes:true}
+];
+const REQUESTS = ["No eye contact.","Don't make it weird.","Stir it counterclockwise. I'll know.","Hurry. I have a nap at 3.","And don't say anything.","Make it like my mother never did.","I'm watching you.","Quickly. My human thinks I'm asleep.","This is my fourth café today.","Surprise me. Don't surprise me.","I will be judging."];
+const PURRS = ["…acceptable. *purr*","Fine. Purr.","I suppose I'll allow it.","Hm. Not terrible.","*purrs against my will*","Tell no one I liked this.","You may live."];
+const SCOLDS = ["Lazy human. Get my order right next time.","Did you even read it, human?","I've seen dogs make better drinks. DOGS.","Try again, can opener.","This is why cats run the house.","Unacceptable, human.","Were you napping? That's MY job.","I asked nicely. Well, I asked.","You had one job, human.","I'll be back. You'll do better. Or else.","My human can't open a can and still does better.","Clean that up. I'll wait. Judgmentally.",
+  "Is this a dog restaurant? Those silly animals will eat anything.","I want my caviar fresh, human. FRESH.","Serve this to a dog. They'll drink out of a puddle.","Do I look like a golden retriever to you?","A dog would say thank you for this. I am not a dog.","I'm used to caviar. On a silver plate. Served by a butler.","This tastes like something a dog dug up.","I didn't climb onto this stool to be treated like a labrador."];
+const LEAVES = ["My nap is calling.","Wake me when you're competent."];
+const SCIENCE = [
+  {game:"Short casual games",
+   find:"A review of 28 studies found casual games like Tetris are a promising way to lower stress and anxiety. In several studies they beat sitting quietly or browsing the web. Fast action games tended to raise stress instead.",
+   lim:"The review called the evidence promising, not conclusive. Studies were small and mixed in quality.",
+   cite:"Pallavicini, Pepe & Mantovani (2021), JMIR Mental Health, 8(8), e28150",
+   url:"https://mental.jmir.org/2021/8/e28150"}
+];
+const $ = id => document.getElementById(id);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const rand = (a,b) => a + Math.random()*(b-a);
+const findItem = (g, id) => MENU[g].find(x=>x.id===id);
+let S, raf = 0, audio = null, muted = false;
+
+function reset(){
+  S = {pre:S?S.pre:null, post:null, phase:'intro', coins:0, purrs:0, knocked:0, left:0, served:0, streak:0, best:0,
+       elapsed:0, last:0, paused:false, cat:null, build:{}, busy:true, lastCat:-1};
+}
+reset();
+
+document.querySelectorAll('details.sci .sci-list').forEach(list=>{
+  list.innerHTML = '<p class="muted" style="font-size:.9rem">This game was built for fun. It has some support from general research on casual games, but this game itself has not been tested in a study. The cats are just for laughs.</p>' +
+    SCIENCE.map(s=>'<div class="sci-item"><span class="game">'+s.game+'</span><p>'+s.find+'</p><p class="lim">Limit: '+s.lim+'</p><p class="cite"><a href="'+s.url+'" target="_blank" rel="noopener">'+s.cite+'</a></p></div>').join('');
+});
+
+function show(id){ ['intro','play','after','results'].forEach(s => $(s).hidden = s!==id); window.scrollTo(0,0); }
+function buildFeel(el, onPick){
+  el.innerHTML = '';
+  FEELS.forEach((f,i)=>{
+    const b = document.createElement('button'); b.type='button'; b.setAttribute('aria-pressed','false');
+    b.innerHTML = '<span class="n">'+(i+1)+'</span><span>'+f+'</span>';
+    b.onclick = ()=>{ [...el.children].forEach(c=>c.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); onPick(i+1); };
+    el.appendChild(b);
+  });
+}
+buildFeel($('feelPre'), v=>{ S.pre = v; });
+
+/* ---------- drawing ---------- */
+function catSVG(c, mood){
+  const L = c.line, f = c.fur;
+  let s = '<ellipse cx="80" cy="150" rx="58" ry="42" fill="'+f+'" stroke="'+L+'" stroke-width="3"/>';
+  s += '<path d="M38 52 L46 8 L74 34 Z" fill="'+f+'" stroke="'+L+'" stroke-width="3" stroke-linejoin="round"/>';
+  s += '<path d="M122 52 L114 8 L86 34 Z" fill="'+f+'" stroke="'+L+'" stroke-width="3" stroke-linejoin="round"/>';
+  s += '<path d="M46 40 L49 20 L62 33 Z M114 40 L111 20 L98 33 Z" fill="#f4a3b6"/>';
+  s += '<ellipse cx="80" cy="76" rx="50" ry="44" fill="'+f+'" stroke="'+L+'" stroke-width="3"/>';
+  if(c.patch) s += '<path d="M42 60 q14 -26 34 -18 q-4 22 -30 26 z" fill="#e8964a"/><path d="M100 46 q18 2 22 22 q-14 4 -24 -6 z" fill="#2f2b33"/>';
+  if(c.stripes) s += '<path d="M70 36 q4 10 0 18 M80 34 q4 10 0 20 M90 36 q4 10 0 18" stroke="'+L+'" stroke-width="3" fill="none" opacity=".45" stroke-linecap="round"/>';
+  if(mood==='purr'){
+    s += '<path d="M54 80 q9 -10 18 0 M88 80 q9 -10 18 0" stroke="'+L+'" stroke-width="3.5" fill="none" stroke-linecap="round"/>';
+    s += '<ellipse cx="50" cy="94" rx="8" ry="5" fill="#f4a3b6" opacity=".7"/><ellipse cx="110" cy="94" rx="8" ry="5" fill="#f4a3b6" opacity=".7"/>';
+    s += '<path d="M70 100 q5 6 10 0 q5 6 10 0" stroke="'+L+'" stroke-width="3" fill="none" stroke-linecap="round"/>';
+  } else {
+    const angry = mood==='angry';
+    s += '<ellipse cx="62" cy="80" rx="10" ry="8" fill="#f5e27a" stroke="'+L+'" stroke-width="2"/><ellipse cx="98" cy="80" rx="10" ry="8" fill="#f5e27a" stroke="'+L+'" stroke-width="2"/>';
+    s += '<ellipse cx="62" cy="81" rx="3" ry="6" fill="#1b1420"/><ellipse cx="98" cy="81" rx="3" ry="6" fill="#1b1420"/>';
+    // half-closed lids
+    s += '<path d="M51 80 q11 '+(angry?'-4':'-9')+' 22 0 L73 70 L51 70 Z" fill="'+f+'"/><path d="M87 80 q11 '+(angry?'-4':'-9')+' 22 0 L109 70 L87 70 Z" fill="'+f+'"/>';
+    s += '<path d="M51 80 q11 '+(angry?'-4':'-9')+' 22 0 M87 80 q11 '+(angry?'-4':'-9')+' 22 0" stroke="'+L+'" stroke-width="2.5" fill="none"/>';
+    s += angry ? '<path d="M48 62 L74 72 M112 62 L86 72" stroke="'+L+'" stroke-width="4" stroke-linecap="round"/>'
+               : '<path d="M50 66 L72 70 M110 66 L88 70" stroke="'+L+'" stroke-width="3.5" stroke-linecap="round"/>';
+    s += '<path d="M70 106 q10 '+(angry?'-9':'-6')+' 20 0" stroke="'+L+'" stroke-width="3" fill="none" stroke-linecap="round"/>';
+  }
+  s += '<path d="M75 92 L85 92 L80 98 Z" fill="#e7869d"/>';
+  s += '<path d="M44 96 L20 92 M44 101 L20 104 M116 96 L140 92 M116 101 L140 104" stroke="'+L+'" stroke-width="2" stroke-linecap="round" opacity=".7"/>';
+  return s;
+}
+
+function cupSVG(b){
+  if(!b.cup) return '<svg viewBox="0 0 100 100"><rect x="20" y="30" width="60" height="58" rx="10" fill="none" stroke="#3a2440" stroke-width="2.5" stroke-dasharray="6 5" opacity=".5"/><text x="50" y="64" text-anchor="middle" font-size="11" font-weight="700" fill="#6d5a72">pick a cup</text></svg>';
+  const P = {
+    mug:  {liq:[24,74,40], top:34, body:'<rect x="20" y="36" width="58" height="52" rx="8" fill="#fff" stroke="#3a2440" stroke-width="3"/><path d="M78 48 q16 0 16 14 q0 14 -16 14" fill="none" stroke="#3a2440" stroke-width="3"/>'},
+    bowl: {liq:[18,82,50], top:44, body:'<path d="M12 50 Q50 98 88 50 Z" fill="#fff" stroke="#3a2440" stroke-width="3" stroke-linejoin="round"/>'},
+    box:  {liq:[26,74,44], top:38, body:'<rect x="22" y="40" width="56" height="48" fill="#c8955c" stroke="#3a2440" stroke-width="3"/><path d="M22 40 L10 30 L36 30 L38 40 M78 40 L90 30 L64 30 L62 40" fill="#b07d46" stroke="#3a2440" stroke-width="2.5" stroke-linejoin="round"/><text x="50" y="72" text-anchor="middle" font-size="9" font-weight="700" fill="#3a2440" opacity=".6">THIS SIDE UP</text>'},
+    glass:{liq:[31,69,30], top:22, body:'<path d="M26 24 L74 24 L60 64 L40 64 Z" fill="rgba(255,255,255,.55)" stroke="#3a2440" stroke-width="3" stroke-linejoin="round"/><path d="M50 64 L50 84 M36 88 L64 88" stroke="#3a2440" stroke-width="3" stroke-linecap="round"/>'}
+  }[b.cup];
+  let s = '<svg viewBox="0 0 100 100">';
+  s += P.body;
+  const [x1,x2,y] = P.liq;
+  if(b.base){
+    const base = findItem('base', b.base);
+    const inset = b.cup==='glass' ? 3 : 0;
+    s += '<rect x="'+(x1+inset)+'" y="'+y+'" width="'+(x2-x1-inset*2)+'" height="8" rx="3" fill="'+base.c+'" stroke="#3a2440" stroke-width="1.5"/>';
+    if(b.addin){ const a = findItem('addin', b.addin); s += '<path d="M'+(x1+10)+' '+(y+4)+' q8 -5 16 0 q8 5 16 0" stroke="'+a.c+'" stroke-width="3" fill="none" stroke-linecap="round"/>'; }
+  } else if(b.addin){
+    const a = findItem('addin', b.addin); s += '<circle cx="50" cy="'+(y+4)+'" r="4" fill="'+a.c+'" stroke="#3a2440" stroke-width="1.5"/>';
+  }
+  if(b.top){
+    const t = P.top, mid = (x1+x2)/2;
+    if(b.top==='foam') s += '<ellipse cx="'+mid+'" cy="'+(t+2)+'" rx="'+((x2-x1)/2)+'" ry="7" fill="#fff" stroke="#3a2440" stroke-width="2"/>';
+    if(b.top==='whip') s += '<path d="M'+(mid-18)+' '+(t+6)+' q-4 -10 8 -10 q0 -10 10 -8 q10 -2 10 8 q12 0 8 10 Z" fill="#fff6ea" stroke="#3a2440" stroke-width="2" stroke-linejoin="round"/>';
+    if(b.top==='flakes') for(let i=0;i<7;i++) s += '<rect x="'+(x1+4+i*((x2-x1-8)/7))+'" y="'+(t+((i%2)?0:4))+'" width="5" height="3" rx="1" fill="#f08a3c" transform="rotate('+(i*25)+' '+(x1+6+i*7)+' '+(t+2)+')"/>';
+    if(b.top==='sprinkles'){ const cs = ['#e94f8a','#4fa3e9','#ffd23f','#5e9e46']; for(let i=0;i<9;i++) s += '<rect x="'+(x1+3+i*((x2-x1-6)/9))+'" y="'+(t+((i%3)*3))+'" width="5" height="2" rx="1" fill="'+cs[i%4]+'"/>'; }
+  }
+  return s + '</svg>';
+}
+
+/* ---------- register ---------- */
+function buildRegister(){
+  const reg = $('reg'); reg.innerHTML = '';
+  GROUPS.forEach(([g, label])=>{
+    const row = document.createElement('div'); row.className = 'grp';
+    row.innerHTML = '<span class="gl">'+label+'</span>';
+    MENU[g].forEach(item=>{
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.dataset.g = g; b.dataset.id = item.id;
+      b.setAttribute('aria-pressed','false');
+      b.innerHTML = (item.c ? '<span class="dot" style="background:'+item.c+'"></span>' : '') + '<span>'+item.name+'</span>';
+      b.onclick = ()=>{
+        if(S.busy || S.phase!=='play') return;
+        S.build[g] = S.build[g]===item.id ? undefined : item.id;
+        syncChips(); $('cup').innerHTML = cupSVG(S.build); sfx.click();
+      };
+      row.appendChild(b);
+    });
+    reg.appendChild(row);
+  });
+}
+function syncChips(){ document.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed', S.build[c.dataset.g]===c.dataset.id)); }
+
+/* ---------- sound ---------- */
+function initAudio(){ try{ audio = audio || new (window.AudioContext||window.webkitAudioContext)(); if(audio.state==='suspended') audio.resume(); }catch(e){ audio = null; } }
+function tone(f1, f2, dur, type, vol, delay){
+  if(!audio || muted) return;
+  const t = audio.currentTime + (delay||0), o = audio.createOscillator(), g = audio.createGain();
+  o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t+dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t+0.02); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t+dur+0.02);
+}
+function purrSound(){
+  if(!audio || muted) return;
+  const t = audio.currentTime, o = audio.createOscillator(), g = audio.createGain(), lfo = audio.createOscillator(), lg = audio.createGain();
+  o.type = 'sawtooth'; o.frequency.value = 55; lfo.frequency.value = 24; lg.gain.value = 0.05;
+  lfo.connect(lg); lg.connect(g.gain); g.gain.value = 0.05;
+  const lp = audio.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 300;
+  o.connect(lp); lp.connect(g); g.connect(audio.destination);
+  o.start(t); lfo.start(t); g.gain.setTargetAtTime(0, t+0.9, 0.15); o.stop(t+1.4); lfo.stop(t+1.4);
+}
+const sfx = {
+  click(){ tone(900, 700, 0.05, 'triangle', 0.04); },
+  meow(){ tone(500, 900, 0.18, 'triangle', 0.08); tone(900, 450, 0.3, 'triangle', 0.08, 0.17); },
+  crash(){ tone(1400, 250, 0.14, 'sawtooth', 0.025, 0.32); tone(300, 60, 0.25, 'square', 0.06, 0.47); tone(1800, 900, 0.12, 'triangle', 0.05, 0.5); tone(1400, 700, 0.15, 'triangle', 0.04, 0.58); },
+  coin(){ tone(1000, 1500, 0.08, 'square', 0.04); tone(1500, 2000, 0.1, 'square', 0.04, 0.08); },
+  huff(){ tone(260, 140, 0.35, 'sawtooth', 0.05); }
+};
+$('muteBtn').onclick = ()=>{ muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; $('muteBtn').setAttribute('aria-pressed', muted); };
+
+/* ---------- cats and orders ---------- */
+function makeOrder(){
+  const n = S.served;
+  const o = {cup: pick(MENU.cup).id, base: pick(MENU.base).id};
+  const level = Math.min(3, Math.floor(n/2));
+  if(level===1) o.addin = pick(MENU.addin).id;
+  if(level===2){ if(Math.random()<.5) o.addin = pick(MENU.addin).id; else o.top = pick(MENU.top).id; if(Math.random()<.4){ o.addin = o.addin || pick(MENU.addin).id; o.top = o.top || pick(MENU.top).id; } }
+  if(level>=3){ o.addin = pick(MENU.addin).id; o.top = pick(MENU.top).id; }
+  return o;
+}
+function orderText(o){
+  let t = 'One <b>'+findItem('base',o.base).name.toLowerCase()+'</b>';
+  if(o.addin) t += ' with <b>'+findItem('addin',o.addin).name.toLowerCase()+'</b>';
+  if(o.top) t += ', <b>'+findItem('top',o.top).name.toLowerCase()+'</b> on top';
+  const cup = findItem('cup',o.cup).name.toLowerCase();
+  t += ', in a <b>'+cup+'</b>.';
+  return t + ' <span class="muted">'+pick(REQUESTS)+'</span>';
+}
+function setMood(m){ S.cat.mood = m; $('catSvg').innerHTML = catSVG(S.cat.look, m); }
+function say(html, plain){ const b = $('bubble'); b.innerHTML = html; b.classList.toggle('say', !!plain); }
+
+function nextCat(){
+  if(S.phase!=='play') return;
+  let idx; do { idx = Math.floor(Math.random()*CATS.length); } while(idx===S.lastCat);
+  S.lastCat = idx;
+  const t = Math.min(1, S.elapsed/GAME_SECONDS);
+  const order = makeOrder();
+  const parts = 2 + (order.addin?1:0) + (order.top?1:0);
+  S.cat = {look:CATS[idx], order, mood:'grumpy', patience: Math.max(7, 9 + parts*2.2 - t*5), left:0, state:'arriving'};
+  S.cat.left = S.cat.patience;
+  S.build = {}; syncChips(); const cup = $('cup'); cup.className = 'cup'; cup.innerHTML = cupSVG(S.build);
+  const catEl = $('cat'); catEl.className = 'cat'; void catEl.offsetWidth;
+  setMood('grumpy'); $('catName').textContent = CATS[idx].name;
+  $('paw').style.setProperty('--pawc', CATS[idx].fur);
+  say('…', true); $('patience').classList.remove('on');
+  requestAnimationFrame(()=>catEl.classList.add('in'));
+  setTimeout(()=>{
+    if(S.phase!=='play') return;
+    S.cat.state = 'ordering'; S.busy = false;
+    say(orderText(order)); sfx.meow();
+    $('patience').classList.add('on'); updatePatience();
+  }, 650);
+}
+function updatePatience(){
+  const p = Math.max(0, S.cat.left / S.cat.patience);
+  const bar = $('patBar'); bar.style.width = (p*100)+'%';
+  bar.style.background = p > .5 ? 'var(--good)' : p > .25 ? '#e0a020' : 'var(--bad)';
+  if(p < .35 && S.cat.mood==='grumpy') setMood('angry');
+}
+
+function mismatch(){
+  const o = S.cat.order, b = S.build;
+  const gname = {cup:'cup', base:'drink', addin:'add-in', top:'topping'};
+  for(const g of ['cup','base','addin','top']){
+    const want = o[g], got = b[g];
+    if(want && !got) return 'Where is my '+findItem(g,want).name.toLowerCase()+'?';
+    if(!want && got) return 'I did NOT ask for '+findItem(g,got).name.toLowerCase()+'.';
+    if(want && got && want!==got) return findItem(g,got).name+'? I said '+findItem(g,want).name.toLowerCase()+'.';
+  }
+  return null;
+}
+
+function serve(){
+  if(S.busy || S.phase!=='play' || !S.cat || S.cat.state!=='ordering') return;
+  S.busy = true; S.cat.state = 'done'; S.served++;
+  $('patience').classList.remove('on');
+  const wrong = mismatch();
+  if(!wrong){
+    const speed = S.cat.left / S.cat.patience;
+    S.streak++; S.best = Math.max(S.best, S.streak); S.purrs++;
+    const tip = 10 + Math.round(5*speed) + Math.min(10, (S.streak-1)*2);
+    S.coins += tip;
+    setMood('purr'); say(pick(PURRS), true); purrSound(); sfx.coin();
+    $('cup').classList.add('sent');
+    hearts(); coinPop('+'+tip);
+    if(S.streak>=3 && S.streak%3===0) setTimeout(()=>say('Word is spreading. '+S.streak+' happy cats in a row.', true), 900);
+    hud(); setTimeout(()=>leave(), 1500);
+  } else {
+    S.streak = 0; S.knocked++;
+    setMood('angry'); say(wrong+' <span class="muted">*stares at you* *swats cup off counter*</span>');
+    swat();
+    sfx.crash(); hud();
+    setTimeout(()=>{ if(S.phase==='play') say(pick(SCOLDS), true); }, 1250);
+    setTimeout(()=>leave(), 3000);
+  }
+}
+// The cat winds up, swats the cup, and it tips over and falls off the counter
+function swat(){
+  const scene = $('scene'), cup = $('cup'), cat = $('cat'), paw = $('paw');
+  const sr = scene.getBoundingClientRect(), cr = cup.getBoundingClientRect(), kr = cat.getBoundingClientRect();
+  const sx = kr.left - sr.left + kr.width*0.22, sy = kr.top - sr.top + kr.height*0.68;      // cat's shoulder
+  const tx = cr.left - sr.left + cr.width*0.62, ty = cr.top - sr.top + cr.height*0.42;      // side of the cup
+  const len = Math.hypot(sx - tx, sy - ty);
+  const aim = Math.atan2(ty - sy, tx - sx) * 180/Math.PI - 180;
+  // the arm's right edge sits at the shoulder (the pivot); its paw end reaches the cup
+  const w = Math.max(30, len - 2);
+  paw.style.width = w+'px'; paw.style.left = (sx - w)+'px'; paw.style.top = (sy - 11)+'px';
+  paw.style.setProperty('--aim', aim+'deg');
+  paw.classList.remove('go'); cat.classList.remove('swat'); void paw.offsetWidth;
+  paw.classList.add('go'); cat.classList.add('swat');
+  setTimeout(()=>{
+    cup.classList.add('knock');
+    const base = S.build.base ? findItem('base', S.build.base).c : null;
+    if(base) splash(tx - 14, ty - 10, base);
+  }, 460);
+  setTimeout(()=>cat.classList.remove('swat'), 1000);
+}
+function splash(x, y, color){
+  const scene = $('scene');
+  for(let i=0;i<7;i++){
+    const d = document.createElement('span'); d.className = 'drop';
+    const dx = -rand(30, 110), up = -rand(20, 60);
+    d.style.left = x+'px'; d.style.top = y+'px';
+    d.style.setProperty('--c', color);
+    d.style.setProperty('--mx', (dx*0.5)+'px'); d.style.setProperty('--my', up+'px');
+    d.style.setProperty('--dx', dx+'px'); d.style.setProperty('--dy', rand(60, 140)+'px');
+    d.style.animationDelay = (i*0.02)+'s';
+    scene.appendChild(d); setTimeout(()=>d.remove(), 1000);
+  }
+}
+function timeout(){
+  S.busy = true; S.cat.state = 'done'; S.left++; S.streak = 0;
+  $('patience').classList.remove('on');
+  setMood('angry'); say(pick(LEAVES), true); sfx.huff(); hud();
+  setTimeout(()=>leave(), 1300);
+}
+function leave(){
+  if(S.phase!=='play') return;
+  const catEl = $('cat'); catEl.classList.remove('in'); catEl.classList.add('out');
+  say('…', true);
+  setTimeout(nextCat, 800);
+}
+function hearts(){
+  const scene = $('scene');
+  for(let i=0;i<4;i++){
+    const h = document.createElement('span'); h.className = 'heart'; h.textContent = '♥';
+    h.style.right = (18 + rand(0, 25))+'%'; h.style.top = (30 + rand(0, 20))+'%'; h.style.animationDelay = (i*.12)+'s';
+    scene.appendChild(h); setTimeout(()=>h.remove(), 1800);
+  }
+}
+function coinPop(t){ const c = $('coinpop'); c.textContent = t; c.classList.remove('show'); void c.offsetWidth; c.classList.add('show'); }
+function hud(){ $('hCoins').textContent = S.coins; $('hPurrs').textContent = S.purrs; }
+
+/* ---------- loop ---------- */
+function loop(ts){
+  if(S.phase!=='play') return;
+  const dt = S.last ? Math.min(.05, (ts - S.last)/1000) : 0; S.last = ts;
+  if(!S.paused){
+    S.elapsed += dt;
+    $('hTime').textContent = Math.max(0, Math.ceil(GAME_SECONDS - S.elapsed));
+    if(S.cat && S.cat.state==='ordering'){
+      S.cat.left -= dt; updatePatience();
+      if(S.cat.left <= 0) timeout();
+    }
+    if(S.elapsed >= GAME_SECONDS){ endGame(); return; }
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+function start(){
+  const pre = S.pre; reset(); S.pre = pre;
+  initAudio(); show('play'); buildRegister(); hud();
+  $('hTime').textContent = GAME_SECONDS;
+  S.phase = 'play';
+  const ov = $('overlay'); ov.innerHTML = '<h2>The café is open.</h2><p>Here comes the first customer. Good luck.</p>'; ov.hidden = false;
+  setTimeout(()=>{ ov.hidden = true; S.last = 0; raf = requestAnimationFrame(loop); nextCat(); }, 1300);
+}
+function endGame(){
+  S.phase = 'done'; S.busy = true; cancelAnimationFrame(raf);
+  const ov = $('overlay'); ov.innerHTML = '<h2>Closing time!</h2><p>'+S.purrs+' cats purred. '+S.knocked+' cups hit the floor.</p>'; ov.hidden = false;
+  setTimeout(()=>{
+    ov.hidden = true;
+    S.post = null; $('seeBtn').disabled = true;
+    buildFeel($('feelPost'), v=>{ S.post = v; $('seeBtn').disabled = false; });
+    show('after');
+  }, 2000);
+}
+
+function rankFor(){
+  if(S.purrs >= 8 && S.knocked === 0 && S.left === 0) return ['Head Barista of Cats', 'Not one cup on the floor. The cats are pretending they don\'t love you.'];
+  if(S.purrs >= 6) return ['Purr Technician', 'You speak fluent cat. Mostly.'];
+  if(S.knocked > S.purrs) return ['Professional Floor Mopper', 'The floor has seen more drinks than the cats have.'];
+  if(S.left >= 3) return ['Slow Brew Specialist', 'Several cats aged a full life waiting. They\'ll be back. Out of spite.'];
+  if(S.purrs >= 3) return ['Apprentice Can Opener', 'A solid first shift. The cats remain suspicious.'];
+  return ['Trainee in Training', 'The cats have filed a group complaint. It just says "no."'];
+}
+
+function results(){
+  show('results');
+  const [rank, line] = rankFor();
+  $('rRank').textContent = rank; $('rRankLine').textContent = line;
+  $('rCoins').textContent = S.coins; $('rServed').textContent = S.served; $('rPurrs').textContent = S.purrs;
+  $('rKnocked').textContent = S.knocked; $('rLeft').textContent = S.left; $('rStreak').textContent = S.best;
+  let f = 'You said you feel '+FEELS[S.post-1].toLowerCase()+'.';
+  if(S.pre){
+    const d = S.post - S.pre;
+    f = 'You started at '+FEELS[S.pre-1].toLowerCase()+' and ended at '+FEELS[S.post-1].toLowerCase()+'. ';
+    f += d>0 ? 'That is '+d+' step'+(d>1?'s':'')+' better.' : d<0 ? 'A bit more tense than before. The cats may be to blame.' : 'No change this time.';
+  }
+  $('rFeel').textContent = f;
+  saveHist();
+}
+function saveHist(){
+  let h = [];
+  try{ h = JSON.parse(localStorage.getItem('grumpycat-hist')||'[]'); }catch(e){ h = []; }
+  h.unshift({d:new Date().toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}),
+    c:S.coins, p:S.purrs, pre:S.pre, post:S.post});
+  h = h.slice(0,5);
+  try{ localStorage.setItem('grumpycat-hist', JSON.stringify(h)); }catch(e){}
+  if(h.length > 1){
+    $('histWrap').hidden = false;
+    $('hist').innerHTML = h.map(x=>'<div><span>'+x.d+'</span><span>'+x.c+' tips · '+x.p+' purrs · '+(x.pre?x.pre+'→':'')+x.post+'/5</span></div>').join('');
+  } else $('histWrap').hidden = true;
+}
+
+$('heroCat').innerHTML = catSVG(CATS[0], 'grumpy');
+$('startBtn').onclick = start;
+$('skipBtn').onclick = ()=>{ S.pre = null; start(); };
+$('serveBtn').onclick = serve;
+$('trashBtn').onclick = ()=>{ if(S.busy) return; S.build = {}; syncChips(); $('cup').innerHTML = cupSVG(S.build); };
+$('seeBtn').onclick = results;
+$('againBtn').onclick = ()=>{ S.pre = null; reset(); buildFeel($('feelPre'), v=>{ S.pre=v; }); show('intro'); };
+document.addEventListener('visibilitychange', ()=>{
+  if(S.phase!=='play') return;
+  if(document.hidden){ S.paused = true; }
+  else {
+    const ov = $('overlay'); ov.innerHTML = '<h2>Welcome back.</h2><p>The cats pretended not to notice you left.</p>'; ov.hidden = false;
+    setTimeout(()=>{ ov.hidden = true; S.paused = false; S.last = 0; }, 1300);
+  }
+});
+})();
+</script>
+</body>
+</html>
